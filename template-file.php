@@ -75,6 +75,8 @@ class cfct_module_option_template_file extends cfct_module_option {
 		$predefined_classes = array();
 		$input_class = (empty($dropdown_opts) ? 'no-button' : null);
 
+        file_put_contents(WP_CONTENT_DIR.'/debug.log', $module_type);
+
 		$value = null;
 		if (!empty($data['template-file'])) {
 			$value = implode(' ', array_map('esc_attr', $data['template-file']));
@@ -217,29 +219,29 @@ class cfct_module_option_template_file extends cfct_module_option {
         // Current path for theme
         $theme_path = get_stylesheet_directory();
         // Search templates files started with "wp-cb-"
-        $files = glob($theme_path.'/wp-cb-*.php');
+        $files = glob($theme_path.'/cfct-*.php');
         // Sweet module name
         $module_name = str_replace('_', '-', $module_type);
         // Templates for current module
         $templates = array();
-
-        // Search default template
-        $default_template = '';
-        if (file_exists($theme_path.'/'.$module_name.'.php')) {
-            $default_template = $module_name;
-        }
-        $templates[$default_template] = array(
-            'Name' => 'Default',
-            'Package' => $module_name,
-            'Description' => 'Default template'
-        );
-
         // Template Headers
         $template_headers = array(
             'Name' => 'Template Name',
             'Package' => 'Template Package',
             'Description' => 'Template Description'
         );
+        // Search default template
+        $default_template = '';
+        $default_template_data = array(
+            'Name' => 'Default',
+            'Package' => $module_name,
+            'Description' => 'Default template'
+        );
+        if (file_exists($theme_path.'/'.$module_name.'.php')) {
+            $default_template = $module_name;
+            $default_template_data = get_file_data($theme_path.'/'.$module_name.'.php', $template_headers, 'template-file');
+        }
+        $templates[$default_template] = $default_template_data;
 
         // Search additional templates
         foreach ($files as $file) {
