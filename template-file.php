@@ -10,6 +10,8 @@ class cfct_module_option_template_file extends cfct_module_option {
 	// Template filename
 	public $template_file = null;
 
+    public $parent_id_base = null;
+
 	public function __construct() {
 		// Register new item in config menu for every module
 		parent::__construct('Set Template', 'template-file');
@@ -31,8 +33,10 @@ class cfct_module_option_template_file extends cfct_module_option {
 		if (isset($data['cfct-module-options'][$this->id_base]['template-file'][0])) {
 			$this->template_file = $data['cfct-module-options'][$this->id_base]['template-file'][0];
 		}
+
 		// Get id_base from parent module (module, not option)
-		$id_base = array_pop(explode(' ', $class));
+		$this->parent_id_base = $id_base = array_pop(explode(' ', $class));
+        
 		// Run display hook for parent module
 		add_filter('cfct-module-'.$id_base.'-view', array($this, 'apply_template_file'));
 
@@ -47,13 +51,20 @@ class cfct_module_option_template_file extends cfct_module_option {
 	 * @return string
 	 */
 	public function apply_template_file($view, $data='') {
+        $_view = $this->template_file;
+
 		// If not setup template file in wp-admin
-		if (empty($this->template_file)) {
-			return $view;
+		if (empty($_view)) {
+            $default = $this->get_default_template($this->parent_id_base);
+            if (empty($default['index'])) {
+                return $view;
+            }
+
+            $_view = $default['index'];
 		}
 
 		// If template file setup
-		$filename = get_stylesheet_directory().DIRECTORY_SEPARATOR.$this->template_file.'.php';
+		$filename = get_stylesheet_directory().DIRECTORY_SEPARATOR.$_view.'.php';
 
 		// Check if file exists
 		if (false == is_file($filename)) {
@@ -215,21 +226,40 @@ class cfct_module_option_template_file extends cfct_module_option {
 		return $ret;
 	}
 
-    private function get_templates($module_type) {
-        // Current path for theme
-        $theme_path = get_stylesheet_directory();
-        // Search templates files started with "wp-cb-"
-        $files = glob($theme_path.'/cfct-*.php');
-        // Sweet module name
-        $module_name = str_replace('_', '-', $module_type);
-        // Templates for current module
-        $templates = array();
-        // Template Headers
-        $template_headers = array(
+    /**
+     * Get sweet module name
+     * @param  $module_type
+     * @return mixed
+     */
+    private function _module_name($module_type) {
+        return str_replace('_', '-', $module_type);
+    }
+
+    /**
+     * Get template headers
+     * @return array
+     */
+    private function _template_headers() {
+        return array(
             'Name' => 'Template Name',
             'Package' => 'Template Package',
             'Description' => 'Template Description'
         );
+    }
+
+    /**
+     * Search default template
+     * 
+     * @param  $module_type
+     * @return array
+     */
+    private function get_default_template($module_type) {
+        // Sweet module name
+        $module_name = $this->_module_name($module_type);
+        
+        // Template Headers
+        $template_headers = $this->_template_headers();
+        
         // Search default template
         $default_template = '';
         $default_template_data = array(
@@ -237,11 +267,42 @@ class cfct_module_option_template_file extends cfct_module_option {
             'Package' => $module_name,
             'Description' => 'Default template'
         );
-        if (file_exists($theme_path.'/'.$module_name.'.php')) {
+        if (file_exists(get_stylesheet_directory().'/'.$module_name.'.php')) {
             $default_template = $module_name;
-            $default_template_data = get_file_data($theme_path.'/'.$module_name.'.php', $template_headers, 'template-file');
+            $default_template_data = get_file_data(get_stylesheet_directory().'/'.$module_name.'.php', $template_headers, 'template-file');
         }
-        $templates[$default_template] = $default_template_data;
+
+        return array(
+            'index' => $default_template,
+            'data' => $default_template_data
+        );
+    }
+
+    /**
+     * Get templates array for current module
+     * 
+     * @param  $module_type
+     * @return array
+     */
+    private function get_templates($module_type) {
+        // Current path for theme
+        $theme_path = get_stylesheet_directory();
+
+        // Search templates files started with "wp-cb-"
+        $files = glob($theme_path.'/cfct-*.php');
+
+        // Sweet module name
+        $module_name = $this->_module_name($module_type);
+
+        // Templates for current module
+        $templates = array();
+
+        // Template Headers
+        $template_headers = $this->_template_headers();
+
+        // Search default template
+        $default = $this->get_default_template($module_type);
+        $templates[$default['index']] = $default['data'];
 
         // Search additional templates
         foreach ($files as $file) {
